@@ -448,6 +448,7 @@ test_open(const char* path, NC_memio* filedata, int mode)
 
     finaldata = calloc(1,sizeof(NC_memio));
 
+#if 0
     fprintf(stderr,"\n\t***Test open 1: nc_open_mem(): read-only\n");
     CHECK(duplicatememory(filedata,&duplicate,0));
     CHECK(nc_open_mem(path, xmode, duplicate.size, duplicate.memory, &ncid));
@@ -467,6 +468,7 @@ test_open(const char* path, NC_memio* filedata, int mode)
     if(finaldata->size != duplicate.size) CHECK(NC_EINVAL);
     if(finaldata->memory != duplicate.memory) CHECK(NC_EINVAL);
     free(finaldata->memory);
+#endif
 
     fprintf(stderr,"\n\t***Test open 3: nc_open_memio(): read-write, copy\n");
     xmode |= NC_WRITE; /* allow file to be modified */
@@ -482,7 +484,7 @@ test_open(const char* path, NC_memio* filedata, int mode)
     if(finaldata->size < filedata->size) CHECK(NC_EINVAL);
     /* As a safeguard, the memory in duplicate should have been set to NULL*/
     free(finaldata->memory);
-
+#if 0
     fprintf(stderr,"\n\t***Test open 4: nc_open_memio(): read-write, locked, extra space\n");
     /* Store the filedata in a memory chunk that leaves room for modification */
     CHECK(duplicatememory(filedata,&duplicate,LARGE_SPACE));
@@ -500,7 +502,7 @@ test_open(const char* path, NC_memio* filedata, int mode)
     if(finaldata->size != duplicate.size) CHECK(NC_EINVAL);
     if(finaldata->memory != duplicate.memory) CHECK(NC_EINVAL);
     free(finaldata->memory);
-
+#endif
     return stat;
 }
 
@@ -606,10 +608,12 @@ main(int argc, char **argv)
     NC_memio filedata4;
 
 #ifdef USE_NETCDF4
-    nc_set_log_level(0);
+extern int hdf5_set_log_level(int);
+    hdf5_set_log_level(0);
     H5Eprint1(stderr);
 #endif
 
+#if 0
     fprintf(stderr,"\n*** Testing the inmemory API: netcdf-3.\n");
     CHECK(create_reference_file(FILE3,NC_NETCDF3,&filedata3)); /* netcdf-3 */
     CHECK(test_open(FILE3,&filedata3,NC_NETCDF3));
@@ -617,6 +621,7 @@ main(int argc, char **argv)
     CHECK(test_misc(FILE3, NC_NETCDF3, &filedata3));
     CHECK(test_xfail(FILE3, NC_NETCDF3, &filedata3));
     memiofree(&filedata3);
+#endif
 
 #ifdef USE_NETCDF4
     fprintf(stderr,"\n*** Testing the inmemory API: netcdf-4.\n");

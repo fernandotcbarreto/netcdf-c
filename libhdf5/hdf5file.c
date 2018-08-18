@@ -227,6 +227,9 @@ dumpopenobjects(NC_FILE_INFO_T* h5)
    assert(h5 && h5->format_file_info);
    hdf5_info = (NC_HDF5_FILE_INFO_T *)h5->format_file_info;
 
+   if(hdf5_info->hdfid <= 0)
+	return; /* File was never opened */
+
    nobjs = H5Fget_obj_count(hdf5_info->hdfid, H5F_OBJ_ALL);
 
    /* Apparently we can get an error even when nobjs == 0 */

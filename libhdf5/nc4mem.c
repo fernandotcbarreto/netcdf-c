@@ -43,13 +43,13 @@ NC4_open_image_file(NC_FILE_INFO_T* h5)
     if(h5->mem.memio.memory == NULL || h5->mem.memio.size == 0)
 	{stat = NC_EINVAL; goto done;}
 
-    /* Figure out the flags */
-    h5->mem.flags = 0;
+    /* Figure out the image flags */
+    h5->mem.imageflags = 0;
     if(h5->mem.locked) {
-	h5->mem.flags |= (H5LT_FILE_IMAGE_DONT_COPY | H5LT_FILE_IMAGE_DONT_RELEASE);
+	h5->mem.imageflags |= (H5LT_FILE_IMAGE_DONT_COPY | H5LT_FILE_IMAGE_DONT_RELEASE);
     }
     if(!h5->no_write)
-	h5->mem.flags |= H5LT_FILE_IMAGE_OPEN_RW;
+	h5->mem.imageflags |= H5LT_FILE_IMAGE_OPEN_RW;
 
     /* Create the file but using our version of H5LTopen_file_image */
     hdfid = NC4_image_init(h5);
@@ -89,14 +89,27 @@ NC4_extract_file_image(NC_FILE_INFO_T* h5)
     hid_t fapl;
     herr_t herr;
     NC_memio mem;
+    hid_t hdfid = -1;
 
     assert(h5 && h5->format_file_info && !h5->no_write);
 
-    /* Get the file access property list */
-    fapl = h5->mem.fapl;
-    if(fapl < 0)
+    if((hdfid = ((NC_HDF5_FILE_INFO_T *)h5->format_file_info)->hdfid) < 0)
 	{stat = NC_EHDFERR; goto done;}
 
+    /* Get the file access property list */
+    if((fapl = H5Fget_access_plist(hdfid)) < 0)
+	{stat = NC_EHDFERR; goto done;}
+#if 0
+{
+    int ok;
+    size_t incr = 0;
+    hbool_t backed = 0;
+    herr_t herr = 0;
+    /* Verify the proplist */
+    herr = H5Pget_fapl_core(fapl,&incr,&backed);
+    ok = (herr == 0);
+}
+#endif
     memset(&mem,0,sizeof(mem));
     herr = H5Pget_file_image(fapl, &mem.memory, &mem.size);
     if(herr < 0)
@@ -106,7 +119,7 @@ NC4_extract_file_image(NC_FILE_INFO_T* h5)
     /* Close FAPL */
     if (H5Pclose(fapl) < 0) 
 	{stat = NC_EHDFERR; goto done;}        
-    h5->mem.fapl = 0;
+
 done:
     return stat;
 }

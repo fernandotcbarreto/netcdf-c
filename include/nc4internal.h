@@ -302,8 +302,7 @@ typedef struct  NC_FILE_INFO
 	int persist; /* Should file be persisted out on close? */
 	int inmemory;
 	int diskless;
-	unsigned int flags; /* for H5LTopen_file_image */
-	int fapl;
+	unsigned int imageflags; /* for H5LTopen_file_image */
 	size_t initialsize;
 	int created; /* 1 => create, 0 => open */
    } mem;
