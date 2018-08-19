@@ -8,10 +8,10 @@ H510=10
 
 #SRC=test_put.c test_get.c test_read.c test_write.c util.c error.c
 
-#CMD=valgrind --leak-check=full
-#CMD=export NETCDF_LOG_LEVEL=5 ;gdb --args
-CMD=gdb --args
 #CMD=env HDF5_DEBUG=trace
+#CMD=export NETCDF_LOG_LEVEL=5 ;gdb --args
+CMD=valgrind --leak-check=full
+CMD=gdb --args
 
 #PAR=1
 

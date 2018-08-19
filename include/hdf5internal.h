@@ -60,4 +60,8 @@ typedef struct  NC_HDF5_FILE_INFO
 int rec_detach_scales(NC_GRP_INFO_T *grp, int dimid, hid_t dimscaleid);
 int rec_reattach_scales(NC_GRP_INFO_T *grp, int dimid, hid_t dimscaleid);
 
+/* In-memory functions */
+extern hid_t NC4_image_init(NC_FILE_INFO_T* h5);
+extern void NC4_image_finalize(void*);
+
 #endif /* _HDF5INTERNAL_ */
