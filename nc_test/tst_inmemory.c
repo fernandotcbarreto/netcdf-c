@@ -448,14 +448,13 @@ test_open(const char* path, NC_memio* filedata, int mode)
 
     finaldata = calloc(1,sizeof(NC_memio));
 
-#if 0
     fprintf(stderr,"\n\t***Test open 1: nc_open_mem(): read-only\n");
     CHECK(duplicatememory(filedata,&duplicate,0));
     CHECK(nc_open_mem(path, xmode, duplicate.size, duplicate.memory, &ncid));
     CHECK(verify_file(ncid,!MODIFIED));
     CHECK(nc_close(ncid));
     free(duplicate.memory);
-
+#if 0
     fprintf(stderr,"\n\t***Test open 2: nc_open_memio(): read-only\n");
     CHECK(duplicatememory(filedata,&duplicate,0));
     duplicate.flags = NC_MEMIO_LOCKED;
@@ -468,7 +467,6 @@ test_open(const char* path, NC_memio* filedata, int mode)
     if(finaldata->size != duplicate.size) CHECK(NC_EINVAL);
     if(finaldata->memory != duplicate.memory) CHECK(NC_EINVAL);
     free(finaldata->memory);
-#endif
 
     fprintf(stderr,"\n\t***Test open 3: nc_open_memio(): read-write, copy\n");
     xmode |= NC_WRITE; /* allow file to be modified */
@@ -484,7 +482,7 @@ test_open(const char* path, NC_memio* filedata, int mode)
     if(finaldata->size < filedata->size) CHECK(NC_EINVAL);
     /* As a safeguard, the memory in duplicate should have been set to NULL*/
     free(finaldata->memory);
-#if 0
+
     fprintf(stderr,"\n\t***Test open 4: nc_open_memio(): read-write, locked, extra space\n");
     /* Store the filedata in a memory chunk that leaves room for modification */
     CHECK(duplicatememory(filedata,&duplicate,LARGE_SPACE));
@@ -627,9 +625,11 @@ extern int hdf5_set_log_level(int);
     fprintf(stderr,"\n*** Testing the inmemory API: netcdf-4.\n");
     CHECK(create_reference_file(FILE4,NC_NETCDF4,&filedata4));
     CHECK(test_open(FILE4,&filedata4,NC_NETCDF4));
+#if 0
     CHECK(test_create(CREATE4,NC_NETCDF4));
     CHECK(test_misc(FILE4,NC_NETCDF4, &filedata4));
     CHECK(test_xfail(FILE4, NC_NETCDF4, &filedata4));
+#endif
     memiofree(&filedata4);
 #endif
 

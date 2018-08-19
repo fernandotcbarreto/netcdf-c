@@ -95,9 +95,8 @@
 #define FALSE 0
 #endif
 
-#undef TRACE
+#define TRACE
 #define CATCH
-#define BREAKPOINT
 
 #ifdef TRACE
 #define CATCH
@@ -105,18 +104,21 @@
 
 #ifdef TRACE
 #include <stdarg.h>
-static void trace(const char* fcn, void* _udata, ...);
-static void traceend(const char* fcn, void* _udata);
+static void trace(const char* fcn, H5FD_file_image_op_t op, void* _udata, ...);
+static void traceend(const char* fcn, void* _udata, uintptr_t retval);
+static const char* traceop(H5FD_file_image_op_t op);
+static void traceflags(int flags);
+
 /* In case we do not have variadic macros */
-#define TRACE1(fcn,udata,x1)  trace(fcn,udata,x1)
-#define TRACE2(fcn,udata,x1,x2)  trace(fcn,udata,x1,x2)
-#define TRACE3(fcn,udata,x1,x2,x3)  trace(fcn,udata,x1,x2,x3)
-#define TRACEEND(fcn,udata) traceend(fcn,udata);
+#define TRACE1(fcn,op,udata,x1)  trace(fcn,op,udata,x1)
+#define TRACE2(fcn,op,udata,x1,x2)  trace(fcn,op,udata,x1,x2)
+#define TRACE3(fcn,op,udata,x1,x2,x3)  trace(fcn,op,udata,x1,x2,x3)
+#define TRACEEND(fcn,udata,retval) traceend(fcn,udata,(uintptr_t)retval);
 #else /*!TRACE*/
-#define TRACE1(fcn,udata,x1)
-#define TRACE2(fcn,udata,x1,x2)
-#define TRACE3(fcn,udata,x1,x2,x3)
-#define TRACEEND(fcn,udata)
+#define TRACE1(fcn,op,udata,x1)
+#define TRACE2(fcn,op,udata,x1,x2)
+#define TRACE3(fcn,op,udata,x1,x2,x3)
+#define TRACEEND(fcn,udata,retval)
 #endif
 
 #ifdef CATCH
@@ -125,14 +127,6 @@ static void tracefail(const char* fcn);
 #else
 #define TRACEFAIL(fcn)
 #endif
-
-#ifdef BREAKPOINT
-static void localbreak(const char* s) {return;}
-#define LOCALBREAK(s) localbreak(s)
-#else
-#define LOCALBREAK(s)
-#endif
-
 
 #define DEFAULT_CREATE_MEMSIZE ((size_t)1<<16)
 
@@ -244,8 +238,7 @@ local_image_malloc(size_t size, H5FD_file_image_op_t file_image_op, void *_udata
     H5LT_file_image_ud_t *udata = (H5LT_file_image_ud_t *)_udata;
     void * return_value = NULL;
 
-    TRACE1("malloc",_udata, size);
-    LOCALBREAK("malloc");
+    TRACE1("malloc", file_image_op, _udata, size);
 
 #if 0
     /* callback is only used if the application buffer is not actually copied */
@@ -260,6 +253,10 @@ local_image_malloc(size_t size, H5FD_file_image_op_t file_image_op, void *_udata
                 if (udata->app_image_ptr == NULL) {
 	            if(NULL == (udata->app_image_ptr = malloc(size)))
 		        LOG((0,"image_malloc: unable to allocate memory block"));
+#ifdef TRACE
+		    fprintf(stderr,"\t>>>> malloc(%ld)=>%p\n",
+				(unsigned long)size,udata->app_image_ptr);
+#endif
 		    udata->app_image_size = size;
 		}
 	    }
@@ -329,7 +326,7 @@ local_image_malloc(size_t size, H5FD_file_image_op_t file_image_op, void *_udata
             goto out;
     } /* end switch */
 
-    TRACEEND("malloc",_udata);
+    TRACEEND("malloc",_udata,return_value);
 
     return(return_value);
 
@@ -362,8 +359,7 @@ local_image_memcpy(void *dest, const void *src, size_t size, H5FD_file_image_op_
 {
     H5LT_file_image_ud_t *udata = (H5LT_file_image_ud_t *)_udata;
 
-    TRACE3("memcpy",_udata,dest,src,size);
-    LOCALBREAK("memcpy");
+    TRACE3("memcpy", file_image_op, _udata,dest,src,size);
 
 #if 0
     /* callback is only used if the application buffer is not actually copied */
@@ -386,6 +382,10 @@ local_image_memcpy(void *dest, const void *src, size_t size, H5FD_file_image_op_
             if (!(udata->flags & H5LT_FILE_IMAGE_DONT_COPY)) {
 		if(src != dest)
 		    memcpy(dest,src,size);
+#ifdef TRACE
+		    fprintf(stderr,"\t>>>> memcpy(%p,%p,%ld)\n",
+				dest,src,(unsigned long)size);
+#endif
 	    }
             break;
 
@@ -432,10 +432,7 @@ local_image_memcpy(void *dest, const void *src, size_t size, H5FD_file_image_op_
             goto out;
     } /* end switch */
 
-#ifdef TRACE
-    fprintf(stderr,"trace: memcpy: dest=%p\n",dest);
-#endif
-    TRACEEND("memcpy",_udata);
+    TRACEEND("memcpy",_udata,dest);
     return(dest);
 
 out:
@@ -465,8 +462,7 @@ local_image_realloc(void *ptr, size_t size, H5FD_file_image_op_t file_image_op, 
     H5LT_file_image_ud_t *udata = (H5LT_file_image_ud_t *)_udata;
     void * return_value = NULL;
 
-    TRACE2("realloc",_udata, ptr, size);
-    LOCALBREAK("realloc");
+    TRACE2("realloc", file_image_op, _udata, ptr, size);
 
 #if 0
     /* callback is only used if the application buffer is not actually copied */
@@ -496,6 +492,10 @@ local_image_realloc(void *ptr, size_t size, H5FD_file_image_op_t file_image_op, 
 		LOG((0,"image_realloc: unable to allocate memory block of size: %lu bytes",(unsigned long)size));
 		goto out;
 	    }
+#ifdef TRACE
+		    fprintf(stderr,"\t>>>> realloc(%p,%ld)=>%p\n",
+				ptr,(unsigned long)size,udata->vfd_image_ptr);
+#endif
             udata->vfd_image_size = size;
            return_value = udata->vfd_image_ptr;
 	} else {
@@ -523,10 +523,7 @@ local_image_realloc(void *ptr, size_t size, H5FD_file_image_op_t file_image_op, 
     else
         goto out;
 
-#ifdef TRACE
-    fprintf(stderr,"trace: realloc: return=%p\n",return_value);
-#endif
-    TRACEEND("realloc",_udata);
+    TRACEEND("realloc",_udata,return_value);
     return(return_value);
 
 out:
@@ -554,8 +551,7 @@ local_image_free(void *ptr, H5FD_file_image_op_t file_image_op, void *_udata)
 {
     H5LT_file_image_ud_t *udata = (H5LT_file_image_ud_t *)_udata;
 
-    TRACE1("free",_udata,ptr);
-    LOCALBREAK("free");
+    TRACE1("free", file_image_op, _udata,ptr);
 
 #if 0
     /* callback is only used if the application buffer is not actually copied */
@@ -577,6 +573,9 @@ local_image_free(void *ptr, H5FD_file_image_op_t file_image_op, void *_udata)
             if (udata->fapl_ref_count == 0 && udata->vfd_ref_count == 0 &&
                     !(udata->flags & H5LT_FILE_IMAGE_DONT_RELEASE)) {
                 free(udata->fapl_image_ptr);
+#ifdef TRACE
+	        fprintf(stderr,"\t>>>> free[fapl](%p)\n",udata->fapl_image_ptr);
+#endif
                 udata->app_image_ptr = NULL;
                 udata->fapl_image_ptr = NULL;
                 udata->vfd_image_ptr = NULL;
@@ -595,7 +594,24 @@ local_image_free(void *ptr, H5FD_file_image_op_t file_image_op, void *_udata)
                and there are no outstanding references */
             if (udata->fapl_ref_count == 0 && udata->vfd_ref_count == 0 &&
                     !(udata->flags & H5LT_FILE_IMAGE_DONT_RELEASE)) {
-                free(udata->vfd_image_ptr);
+	        /* If we expect to give the memory to the caller, then save it instead
+                   of free'ing it
+		*/
+		
+	        /* Reclaim any existing memory unless it the same as vfd ptr*/
+	       if(udata->h5->mem.memio.memory != NULL
+		  && udata->h5->mem.memio.memory != udata->vfd_image_ptr)
+		   free(udata->h5->mem.memio.memory);
+		if(udata->h5->mem.save) {
+		   udata->h5->mem.memio.memory = udata->vfd_image_ptr; 
+		   udata->h5->mem.memio.size = udata->vfd_image_size; 
+		   udata->h5->mem.memio.flags = 0;
+		} else {
+		   free(udata->vfd_image_ptr);
+#ifdef TRACE
+		    fprintf(stderr,"\t>>>> free[vfd](%p)\n",udata->vfd_image_ptr);
+#endif
+		}
                 udata->app_image_ptr = NULL;
                 udata->fapl_image_ptr = NULL;
                 udata->vfd_image_ptr = NULL;
@@ -613,7 +629,7 @@ local_image_free(void *ptr, H5FD_file_image_op_t file_image_op, void *_udata)
             goto out;
     } /* end switch */
 
-    TRACEEND("free",_udata);
+    TRACEEND("free",_udata,1);
     return(SUCCEED);
 
 out:
@@ -641,8 +657,6 @@ static void *
 local_udata_copy(void *_udata)
 {
     H5LT_file_image_ud_t *udata = (H5LT_file_image_ud_t *)_udata;
-
-    LOCALBREAK("udata_copy");
 
 #if 0
     /* callback is only used if the application buffer is not actually copied */
@@ -686,8 +700,6 @@ static herr_t
 local_udata_free(void *_udata)
 {
     H5LT_file_image_ud_t *udata = (H5LT_file_image_ud_t *)_udata;
-
-    LOCALBREAK("udata_free");
 
 #if 0
     /* callback is only used if the application buffer is not actually copied */
@@ -838,15 +850,15 @@ static void
 printudata(H5LT_file_image_ud_t* udata)
 {
     if(udata == NULL) return;
-    fprintf(stderr," flags=0x%0x",udata->flags);
-    fprintf(stderr," flags=0x%0x",udata->flags);
-    fprintf(stderr," ref_count=%d",udata->ref_count);
-    fprintf(stderr," app=(%p,%lld)",udata->app_image_ptr,(long long)udata->app_image_size);
-    fprintf(stderr," fapl=(%p,%lld)[%d]",udata->fapl_image_ptr,(long long)udata->fapl_image_size,udata->fapl_ref_count);
-    fprintf(stderr," vfd=(%p,%lld)[%d]",udata->vfd_image_ptr,(long long)udata->vfd_image_size,udata->vfd_ref_count);
+    fprintf(stderr," flags=");
+    traceflags(udata->flags);
+    fprintf(stderr,"\n\t    ref_count=%d",udata->ref_count);
+    fprintf(stderr,"\n\t    app=(%p,%lld)",udata->app_image_ptr,(long long)udata->app_image_size);
+    fprintf(stderr,"\n\t    fapl=(%p,%lld)[%d]",udata->fapl_image_ptr,(long long)udata->fapl_image_size,udata->fapl_ref_count);
+    fprintf(stderr,"\n\t    vfd=(%p,%lld)[%d]",udata->vfd_image_ptr,(long long)udata->vfd_image_size,udata->vfd_ref_count);
 }
 
-static void trace(const char* fcn, void* _udata, ...)
+static void trace(const char* fcn, H5FD_file_image_op_t op, void* _udata, ...)
 {
     H5LT_file_image_ud_t *udata = NULL;
     va_list ap;
@@ -855,25 +867,28 @@ static void trace(const char* fcn, void* _udata, ...)
     udata = (H5LT_file_image_ud_t *)_udata;
     if(strcmp("malloc",fcn)==0) {
 	size_t size = va_arg(ap,size_t);
-	fprintf(stderr,"trace: %s: size=%lld udata=",fcn,(long long)size);
+	fprintf(stderr,"trace: %s: op=%s: size=%lld\n\tudata=",
+		fcn,traceop(op),(long long)size);
 	printudata(udata);
         fprintf(stderr,"\n");
     } else if(strcmp("realloc",fcn)==0) {
 	void* ptr = va_arg(ap,void*);
 	size_t size = va_arg(ap,size_t);
-	fprintf(stderr,"trace: %s: ptr=%p, size=%lld udata=",fcn,ptr,(long long)size);
+	fprintf(stderr,"trace: %s: op=%s: ptr=%p, size=%lld\n\tudata=",
+		fcn,traceop(op),ptr,(long long)size);
 	printudata(udata);
         fprintf(stderr,"\n");
     } else if(strcmp("free",fcn)==0) {
 	void* ptr = va_arg(ap,void*);
-	fprintf(stderr,"trace: %s: ptr=%p udata=",fcn,ptr);
+	fprintf(stderr,"trace: %s: op=%s: ptr=%p\n\tudata=",fcn,traceop(op),ptr);
 	printudata(udata);
         fprintf(stderr,"\n");
     } else if(strcmp("memcpy",fcn)==0) {
 	void* dest = va_arg(ap,void*);
 	void* src = va_arg(ap,void*);
 	size_t size = va_arg(ap,size_t);
-	fprintf(stderr,"trace: %s: dest=%p src=%p size=%lld udata=",fcn,dest,src,(long long)size);
+	fprintf(stderr,"trace: %s: op=%s: dest=%p src=%p size=%lld\n\tudata=",
+		fcn,traceop(op),dest,src,(long long)size);
 	printudata(udata);
         fprintf(stderr,"\n");
     } else {
@@ -883,10 +898,10 @@ static void trace(const char* fcn, void* _udata, ...)
     fflush(stderr);
 }
 
-static void traceend(const char* fcn, void* _udata)
+static void traceend(const char* fcn, void* _udata, uintptr_t retval)
 {
     H5LT_file_image_ud_t *udata = (H5LT_file_image_ud_t *)_udata;
-    fprintf(stderr,"traceend: %s: udata=",fcn);
+    fprintf(stderr,"traceend: %s: retval=%p\n\tudata=",fcn,(void*)retval);
     printudata(udata);
     fprintf(stderr,"\n");
     fflush(stderr);
@@ -903,26 +918,58 @@ tracefail(const char* fcn)
 }
 #endif /*CATCH*/
 
-#if 0
-    Flag definitions for H5LTopen_file_image():
-#define H5LT_FILE_IMAGE_OPEN_RW      0x0001 /* Open image for read-write */
-#define H5LT_FILE_IMAGE_DONT_COPY    0x0002 /* The HDF5 lib won't copy   */
-/* user supplied image buffer. The same image is open with the core driver.  */
-#define H5LT_FILE_IMAGE_DONT_RELEASE 0x0004 /* The HDF5 lib won't        */
-/* deallocate user supplied image buffer. The user application is reponsible */
-/* for doing so.                                                             */ 
-#define H5LT_FILE_IMAGE_ALL          0x0007
+#ifdef TRACE
+static void
+traceflags(int flags)
+{
+    int i;
+    for(i=0;i<16;i++) {
+	switch(1<<i) {
+	case H5LT_FILE_IMAGE_OPEN_RW: /* 0x0001 Open image for read-write */
+	    if(i > 0) fprintf(stderr,"|");
+	    fprintf(stderr,"OPEN_RW");
+	    break;
+	case H5LT_FILE_IMAGE_DONT_COPY: /*0x0002 the HDF5 lib won't copy   */
+	    if(i > 0) fprintf(stderr,"|");
+	    fprintf(stderr,"DONT_COPY");
+	    break;
+	case H5LT_FILE_IMAGE_DONT_RELEASE: /* 0x0004 The HDF5 lib won't
+                                              deallocate user supplied image
+                                              buffer. The user application
+                                              is reponsible for doing so. */
+	    if(i > 0) fprintf(stderr,"|");
+	    fprintf(stderr,"DONT_RELEASE");
+	    break;
+	default: break;
+	}
+    }
+}
 
-    switch ( file_image_op ) {
-    case H5FD_FILE_IMAGE_OP_NO_OP: break;
-    case H5FD_FILE_IMAGE_OP_PROPERTY_LIST_SET     : break;
-    case H5FD_FILE_IMAGE_OP_PROPERTY_LIST_COPY: break;
-    case H5FD_FILE_IMAGE_OP_PROPERTY_LIST_GET: break;
-    case H5FD_FILE_IMAGE_OP_PROPERTY_LIST_CLOSE: break;
-    case H5FD_FILE_IMAGE_OP_FILE_OPEN: break;
-    case H5FD_FILE_IMAGE_OP_FILE_RESIZE: break;
-    case H5FD_FILE_IMAGE_OP_FILE_CLOSE: break;
+static const char*
+traceop(H5FD_file_image_op_t op)
+{
+    const char* sop = NULL;
+    switch ( op ) {
+    case H5FD_FILE_IMAGE_OP_NO_OP:
+	sop = "NO_OP"; break;
+    case H5FD_FILE_IMAGE_OP_PROPERTY_LIST_SET:
+	sop = "PROPERTY_LIST_SET"; break;
+    case H5FD_FILE_IMAGE_OP_PROPERTY_LIST_COPY:
+	sop = "PROPERTY_LIST_COPY"; break;
+    case H5FD_FILE_IMAGE_OP_PROPERTY_LIST_GET:
+	sop = "PROPERTY_LIST_GET"; break;
+    case H5FD_FILE_IMAGE_OP_PROPERTY_LIST_CLOSE:
+	sop = "PROPERTY_LIST_CLOSE"; break;
+    case H5FD_FILE_IMAGE_OP_FILE_OPEN:
+	sop = "FILE_OPEN"; break;
+    case H5FD_FILE_IMAGE_OP_FILE_RESIZE:
+	sop = "FILE_RESIZE"; break;
+    case H5FD_FILE_IMAGE_OP_FILE_CLOSE:
+	sop = "FILE_CLOSE"; break;
     default: break;
     }
+    return sop;
+}
+
 #endif
 

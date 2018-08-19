@@ -82,6 +82,7 @@ done:
     return stat;
 }
 
+#if 0
 int
 NC4_extract_file_image(NC_FILE_INFO_T* h5)
 {
@@ -96,20 +97,12 @@ NC4_extract_file_image(NC_FILE_INFO_T* h5)
     if((hdfid = ((NC_HDF5_FILE_INFO_T *)h5->format_file_info)->hdfid) < 0)
 	{stat = NC_EHDFERR; goto done;}
 
+    /* The h5->mem.memio struct should contain what we want */
+    
+
     /* Get the file access property list */
     if((fapl = H5Fget_access_plist(hdfid)) < 0)
 	{stat = NC_EHDFERR; goto done;}
-#if 0
-{
-    int ok;
-    size_t incr = 0;
-    hbool_t backed = 0;
-    herr_t herr = 0;
-    /* Verify the proplist */
-    herr = H5Pget_fapl_core(fapl,&incr,&backed);
-    ok = (herr == 0);
-}
-#endif
     memset(&mem,0,sizeof(mem));
     herr = H5Pget_file_image(fapl, &mem.memory, &mem.size);
     if(herr < 0)
@@ -123,3 +116,4 @@ NC4_extract_file_image(NC_FILE_INFO_T* h5)
 done:
     return stat;
 }
+#endif

@@ -16,9 +16,6 @@
 
 extern int nc4_vararray_add(NC_GRP_INFO_T *grp, NC_VAR_INFO_T *var);
 
-/* From nc4mem.c */
-extern int NC4_extract_file_image(NC_FILE_INFO_T* h5);
-
 /** @internal When we have open objects at file close, should
     we log them or print to stdout. Default is to log. */
 #define LOGOPEN 1
@@ -191,19 +188,18 @@ nc4_close_netcdf4_file(NC_FILE_INFO_T *h5, int abort, int extractmem)
    if (h5->fileinfo)
       free(h5->fileinfo);
 
-   /* Check to see if this is an in-memory file and we want to get its
-      final content. */
-   if(extractmem) {
-      /* File must be read/write */
-      if(!h5->no_write) {
-         retval = NC4_extract_file_image(h5);
-      }
-   }
-
-   /* Close hdf file. */
+   /* Close hdf file */
    if (H5Fclose(hdf5_info->hdfid) < 0)
    {
       dumpopenobjects(h5);
+   }
+
+   /* If we do not need to extract memory, then reclaim contents of memio */
+   if(!extractmem || h5->no_write || h5->mem.locked) {
+	if(h5->mem.memio.memory != NULL) 
+	    free(h5->mem.memio.memory);
+	h5->mem.memio.memory = NULL;
+	h5->mem.memio.size = 0;
    }
 
    /* Free the HDF5-specific info. */

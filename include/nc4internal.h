@@ -298,7 +298,8 @@ typedef struct  NC_FILE_INFO
    struct NCFILEINFO* fileinfo;
    struct NC4_Memio {
 	NC_memio memio;
-	int locked; /* do not copy and do not release */
+	int locked; /* do not copy and do not free  */
+	int save; /* on close, save this buffer in memio */
 	int persist; /* Should file be persisted out on close? */
 	int inmemory;
 	int diskless;

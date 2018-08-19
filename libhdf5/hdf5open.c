@@ -390,7 +390,8 @@ nc4_open_file(const char *path, int mode, void* parameters, NC *nc)
          then we must take control of the incoming memory */
       nc4_info->mem.locked = (nc4_info->mem.memio.flags & NC_MEMIO_LOCKED) == NC_MEMIO_LOCKED;
       if(!nc4_info->mem.locked && ((mode & NC_WRITE) == NC_WRITE)) {
-         memparams->memory = NULL; /* take control */
+	nc4_info->mem.save = 1; /* in case the user wants the final buffer */	 
+        memparams->memory = NULL; /* take control */
       }
 #ifdef USE_PARALLEL4
    } else {
