@@ -70,10 +70,10 @@ NC4_create_image_file(NC_FILE_INFO_T* h5, size_t initialsz)
     /* Create the file but using our version of H5LTopen_file_image */
     h5->mem.created = 1;
     h5->mem.initialsize = initialsz;
+    h5->mem.imageflags |= H5LT_FILE_IMAGE_OPEN_RW;
     hdfid = NC4_image_init(h5);
     if(hdfid < 0)
 	{stat = NC_EHDFERR; goto done;}
-
     /* Remember HDF5 file identifier. */
     ((NC_HDF5_FILE_INFO_T *)h5->format_file_info)->hdfid = hdfid;
 done:

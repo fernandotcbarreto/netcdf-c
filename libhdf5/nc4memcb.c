@@ -383,12 +383,13 @@ local_image_memcpy(void *dest, const void *src, size_t size, H5FD_file_image_op_
             if (udata->fapl_ref_count == 0)
                 goto out;
             if (!(udata->flags & H5LT_FILE_IMAGE_DONT_COPY)) {
-		if(src != dest)
+		if(src != dest) {
 		    memcpy(dest,src,size);
 #ifdef TRACE
 		    fprintf(stderr,"\t>>>> memcpy(%p,%p,%ld)\n",
 				dest,src,(unsigned long)size);
 #endif
+		}
 	    }
             break;
 
@@ -734,6 +735,7 @@ NC4_image_init(NC_FILE_INFO_T* h5)
     size_t buf_size = 0;
     void* buf_ptr = NULL;
     unsigned imageflags;
+    int create = 0;
     H5LT_file_image_ud_t *udata = NULL;	/* Pointer to udata structure */
 
     H5FD_file_image_callbacks_t callbacks = {&local_image_malloc, &local_image_memcpy,
@@ -743,10 +745,11 @@ NC4_image_init(NC_FILE_INFO_T* h5)
     static long         file_name_counter;
 
     imageflags = h5->mem.imageflags;
+    create = h5->mem.created;
 
     /* check arguments */
     if (h5->mem.memio.memory == NULL) {
-	if(h5->mem.created) {
+	if(create) {
 	    if(h5->mem.memio.size == 0) h5->mem.memio.size = DEFAULT_CREATE_MEMSIZE;
 	    h5->mem.memio.memory = malloc(h5->mem.memio.size);
 	} else
@@ -805,18 +808,19 @@ NC4_image_init(NC_FILE_INFO_T* h5)
     if (H5Pset_file_image(fapl, buf_ptr, buf_size) < 0)
         goto out;
 
-    /* set file open flags */
-    if (imageflags & H5LT_FILE_IMAGE_OPEN_RW)
+    /* define a unique file name */
+    snprintf(file_name, (sizeof(file_name) - 1), "file_image_%ld", file_name_counter++);
+
+    /* set file open/create flags */
+    if(create)
+        file_open_flags = H5F_ACC_RDWR;
+    else if (imageflags & H5LT_FILE_IMAGE_OPEN_RW)
         file_open_flags = H5F_ACC_RDWR;
     else
         file_open_flags = H5F_ACC_RDONLY;
 
-    /* define a unique file name */
-    snprintf(file_name, (sizeof(file_name) - 1), "file_image_%ld", file_name_counter++);
-
     /* Assign file image in FAPL to the core file driver */
-    if(h5->mem.created) {
-	file_open_flags |= H5F_ACC_TRUNC;
+    if(create) {
         if ((file_id = H5Fcreate(file_name, file_open_flags, H5P_DEFAULT, fapl)) < 0)
             goto out;
     } else {
