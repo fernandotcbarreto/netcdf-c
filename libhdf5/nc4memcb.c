@@ -726,7 +726,7 @@ hid_t
 NC4_image_init(NC_FILE_INFO_T* h5)
 {
     hid_t		fapl = -1, file_id = -1; /* HDF5 identifiers */
-    unsigned            file_open_flags;/* Flags for hdf5 open */
+    unsigned            file_open_flags = 0;/* Flags for hdf5 open */
     char                file_name[64];	/* Filename buffer */
     size_t              alloc_incr;     /* Buffer allocation increment */
     size_t              min_incr = 65536; /* Minimum buffer increment */
@@ -813,7 +813,7 @@ NC4_image_init(NC_FILE_INFO_T* h5)
 
     /* set file open/create flags */
     if(create)
-        file_open_flags = H5F_ACC_RDWR;
+        file_open_flags = H5F_ACC_TRUNC; /* H5Fcreate does not like H5F_ACC_RDWR */
     else if (imageflags & H5LT_FILE_IMAGE_OPEN_RW)
         file_open_flags = H5F_ACC_RDWR;
     else
