@@ -943,7 +943,7 @@ traceend(const char* fcn, void* _udata, uintptr_t retval)
 static void
 tracefail(const char* fcn)
 {
-    fprintf(stderr,"fail: %s",fcn);
+    fprintf(stderr,"fail: %s\n",fcn);
     fflush(stderr);
 }
 #endif /*CATCH*/
@@ -954,6 +954,7 @@ traceflags(int flags)
 {
     int i;
     for(i=0;i<16;i++) {
+	if((flags & 1<<i) == 0) continue;
 	switch(1<<i) {
 	case H5LT_FILE_IMAGE_OPEN_RW: /* 0x0001 Open image for read-write */
 	    if(i > 0) fprintf(stderr,"|");
