@@ -460,6 +460,12 @@ out:
 *
 *-------------------------------------------------------------------------
 */
+
+/* This warning is from H5FDcore.c"
+    Be careful of non-Posix realloc() that doesn't understand
+    what to do when the first argument is null.
+*/
+
 static void *
 local_image_realloc(void *ptr, size_t size, H5FD_file_image_op_t file_image_op, void *_udata)
 {
@@ -487,7 +493,7 @@ local_image_realloc(void *ptr, size_t size, H5FD_file_image_op_t file_image_op, 
 #endif
 
     if (file_image_op == H5FD_FILE_IMAGE_OP_FILE_RESIZE) {
-        if (udata->vfd_image_ptr != ptr)
+        if (ptr != NULL && udata->vfd_image_ptr != ptr)
             goto out;
 
         if (udata->vfd_ref_count != 1)
@@ -496,8 +502,15 @@ local_image_realloc(void *ptr, size_t size, H5FD_file_image_op_t file_image_op, 
         if (!(udata->flags & H5LT_FILE_IMAGE_DONT_COPY)
 	    && !(udata->flags & H5LT_FILE_IMAGE_DONT_RELEASE)) {
 	    void* oldvfd = udata->vfd_image_ptr;
-	    assert(ptr == oldvfd); /* validate */
-	    if(NULL == (udata->vfd_image_ptr = realloc(ptr, size))) {
+	    /* From realloc man page: If ptr is NULL, then the call is equivalent to malloc(size),
+               for all values of size; if size is equal to zero, and ptr is not NULL, then the call
+               is equivalent to free(ptr). */
+	    if(ptr == NULL) {
+		udata->vfd_image_ptr = malloc(size);
+	    } else {
+		udata->vfd_image_ptr = realloc(ptr, size);
+	    }
+            if(NULL == udata->vfd_image_ptr) {
 		LOG((0,"image_realloc: unable to allocate memory block of size: %lu bytes",(unsigned long)size));
 		goto out;
 	    }
@@ -570,9 +583,6 @@ local_image_free(void *ptr, H5FD_file_image_op_t file_image_op, void *_udata)
         goto out;
 #endif
 
-    /* As a rule, we never free a buffer, but instead
-	either do nothing or save it in h5->mem.memio
-    */
     switch(file_image_op) {
         case H5FD_FILE_IMAGE_OP_PROPERTY_LIST_CLOSE:
 	    if (udata->fapl_image_ptr != ptr)
@@ -584,11 +594,22 @@ local_image_free(void *ptr, H5FD_file_image_op_t file_image_op, void *_udata)
 
             /* free the shared buffer only if indicated by the respective flag
 	       and there are no outstanding references */
-            if (udata->fapl_ref_count == 0 && udata->vfd_ref_count == 0) {
-                udata->app_image_ptr = NULL;
+            if (udata->fapl_ref_count == 0) {
+#if 0
+		if(udata->fapl_image_ptr == udata->app_image_ptr)
+		    udata->app_image_ptr = NULL;
+#endif
+		if(udata->fapl_image_ptr == udata->vfd_image_ptr) {
+		    udata->vfd_image_ptr = NULL;
+		    assert(udata->vfd_ref_count == 1);
+		    udata->vfd_ref_count = 0;
+		} 
+	        if(udata->fapl_image_ptr != NULL) {
+		    fprintf(stderr,"\t>>>> fapl free(%p)\n",ptr);
+		    free(udata->fapl_image_ptr);
+		}
                 udata->fapl_image_ptr = NULL;
-                udata->vfd_image_ptr = NULL;
-            } /* end if */
+	    }
             break;
 
         case H5FD_FILE_IMAGE_OP_FILE_CLOSE:
@@ -599,14 +620,20 @@ local_image_free(void *ptr, H5FD_file_image_op_t file_image_op, void *_udata)
 
             udata->vfd_ref_count--;
 
-            if (udata->fapl_ref_count == 0 && udata->vfd_ref_count == 0) {
-	        /* It should be the case that udata->h5->mem.memio.memory === udata->vfd_image_ptr */
-		assert(udata->h5->mem.memio.memory == udata->vfd_image_ptr);
-		/* cleanup */
-                udata->app_image_ptr = NULL;
-                udata->fapl_image_ptr = NULL;
+            if (udata->vfd_ref_count == 0) {
+		if(udata->vfd_image_ptr == udata->app_image_ptr)
+		    udata->app_image_ptr = NULL;
+		if(udata->fapl_image_ptr == udata->vfd_image_ptr) {
+		    udata->fapl_image_ptr = NULL;
+		    assert(udata->fapl_ref_count == 1);
+		    udata->fapl_ref_count = 0;
+		} 
+	        if(udata->vfd_image_ptr != NULL) {
+		    fprintf(stderr,"\t>>>> vfd free(%p)\n",ptr);
+		    free(udata->vfd_image_ptr);
+		}
                 udata->vfd_image_ptr = NULL;
-            } /* end if */
+	    }
             break;
 
 	/* added unused labels to keep the compiler quite */

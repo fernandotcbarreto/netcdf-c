@@ -454,7 +454,7 @@ test_open(const char* path, NC_memio* filedata, int mode)
     CHECK(verify_file(ncid,!MODIFIED));
     CHECK(nc_close(ncid));
     free(duplicate.memory);
-
+#if 0
     fprintf(stderr,"\n\t***Test open 2: nc_open_memio(): read-only\n");
     CHECK(duplicatememory(filedata,&duplicate,0));
     duplicate.flags = NC_MEMIO_LOCKED;
@@ -500,7 +500,7 @@ test_open(const char* path, NC_memio* filedata, int mode)
     if(finaldata->size != duplicate.size) CHECK(NC_EINVAL);
     if(finaldata->memory != duplicate.memory) CHECK(NC_EINVAL);
     free(finaldata->memory);
-
+#endif
     return stat;
 }
 
@@ -625,8 +625,8 @@ extern int hdf5_set_log_level(int);
 #ifdef USE_NETCDF4
     fprintf(stderr,"\n*** Testing the inmemory API: netcdf-4.\n");
     CHECK(create_reference_file(FILE4,NC_NETCDF4,&filedata4));
-//    CHECK(test_open(FILE4,&filedata4,NC_NETCDF4));
-    CHECK(test_create(CREATE4,NC_NETCDF4));
+    CHECK(test_open(FILE4,&filedata4,NC_NETCDF4));
+//    CHECK(test_create(CREATE4,NC_NETCDF4));
 //    CHECK(test_misc(FILE4,NC_NETCDF4, &filedata4));
 //    CHECK(test_xfail(FILE4, NC_NETCDF4, &filedata4));
     memiofree(&filedata4);
