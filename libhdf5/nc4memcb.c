@@ -252,17 +252,10 @@ local_image_malloc(size_t size, H5FD_file_image_op_t file_image_op, void *_udata
     switch ( file_image_op ) {
         /* the app buffer is "copied" to only one FAPL. Afterwards, FAPLs can be "copied" */
         case H5FD_FILE_IMAGE_OP_PROPERTY_LIST_SET:
-	    if (!(udata->flags & H5LT_FILE_IMAGE_DONT_COPY)) { /* Do a malloc */
-                if (udata->app_image_ptr == NULL) {
-	            if(NULL == (udata->app_image_ptr = malloc(size)))
-		        LOG((0,"image_malloc: unable to allocate memory block"));
-#ifdef TRACE
-		    fprintf(stderr,"\t>>>> malloc(%ld)=>%p\n",
-				(unsigned long)size,udata->app_image_ptr);
-#endif
-		    udata->app_image_size = size;
-		}
-	    }
+	    /* It appears that the fapl memory is never created as we use it, so
+               we expect the udata ptr to be either null or same as the app buffer.*/
+	    assert(udata->fapl_image_ptr == NULL || udata->fapl_image_ptr == udata->app_image_ptr);
+
             if (udata->app_image_ptr == NULL)
                 goto out;
             if (udata->app_image_size != size)
@@ -278,6 +271,7 @@ local_image_malloc(size_t size, H5FD_file_image_op_t file_image_op, void *_udata
             udata->fapl_image_size = udata->app_image_size;
             return_value = udata->fapl_image_ptr;
             udata->fapl_ref_count++;
+	    return_value = udata->fapl_image_ptr;
 	    break;
 
 	case H5FD_FILE_IMAGE_OP_PROPERTY_LIST_COPY:
@@ -466,6 +460,19 @@ out:
     what to do when the first argument is null.
 */
 
+/* Modified:
+1. If the realloc new size is <= existing size,
+   then pretend we did a realloc and return success.
+   This avoids unneccessary heap operations.
+2. If the H5LT_FILE_IMAGE_DONT_COPY or
+   H5LT_FILE_IMAGE_DONT_RELEASE flag is set and the
+   realloc new size is > existing size, then fail
+   because the realloc() call may change the address
+   of the buffer. The new address cannot be
+   communicated to the application to release it.
+3. Otherwise, use realloc(). Note that this may have the
+   side effect of freeing the previous memory chunk.
+*/
 static void *
 local_image_realloc(void *ptr, size_t size, H5FD_file_image_op_t file_image_op, void *_udata)
 {
@@ -484,58 +491,36 @@ local_image_realloc(void *ptr, size_t size, H5FD_file_image_op_t file_image_op, 
     if (!(udata->flags & H5LT_FILE_IMAGE_OPEN_RW))
         goto out;
 
-#if 0
-    /* realloc() is not allowed when the HDF5 library won't release the image 
-       buffer because reallocation may change the address of the buffer. The
-       new address cannot be communicated to the application to release it. */
-    if (udata->flags & H5LT_FILE_IMAGE_DONT_RELEASE) 
-        goto out; 
-#endif
+    /* DONT_COPY => DONT_RELEASE */
+    assert(((udata->flags & H5LT_FILE_IMAGE_DONT_COPY)?(udata->flags & H5LT_FILE_IMAGE_DONT_RELEASE):1));
 
+    /* Note that the fapl pointer is never realloc'd */
     if (file_image_op == H5FD_FILE_IMAGE_OP_FILE_RESIZE) {
-        if (ptr != NULL && udata->vfd_image_ptr != ptr)
-            goto out;
 
-        if (udata->vfd_ref_count != 1)
-            goto out;
-
-        if (!(udata->flags & H5LT_FILE_IMAGE_DONT_COPY)
-	    && !(udata->flags & H5LT_FILE_IMAGE_DONT_RELEASE)) {
-	    void* oldvfd = udata->vfd_image_ptr;
-	    /* From realloc man page: If ptr is NULL, then the call is equivalent to malloc(size),
-               for all values of size; if size is equal to zero, and ptr is not NULL, then the call
-               is equivalent to free(ptr). */
-	    if(ptr == NULL) {
+        if (!(udata->flags & H5LT_FILE_IMAGE_DONT_COPY)) { /* buffer modification is allowed */
+	    /* Divide code based on whether ptr == NULL or not */
+ 	    if(ptr == NULL) {
+		/* From realloc man page: If ptr is NULL, then the call is equivalent to malloc(size),
+		   for all values of size; if size is equal to zero, and ptr is not NULL, then the call
+		   is equivalent to free(ptr). */
 		udata->vfd_image_ptr = malloc(size);
-	    } else {
+	        udata->vfd_ref_count++;
+	    } else { /* ptr != NULL */
+		if(udata->vfd_image_ptr != ptr)
+		    goto out;
+		if (udata->vfd_ref_count != 1)
+		    goto out;
 		udata->vfd_image_ptr = realloc(ptr, size);
-	    }
-            if(NULL == udata->vfd_image_ptr) {
-		LOG((0,"image_realloc: unable to allocate memory block of size: %lu bytes",(unsigned long)size));
-		goto out;
-	    }
+		if(NULL == udata->vfd_image_ptr) {
+		    LOG((0,"image_realloc: unable to allocate memory block of size: %lu bytes",(unsigned long)size));
+		    goto out;
+	        }
 #ifdef TRACE
-	    fprintf(stderr,"\t>>>> realloc(%p,%ld)=>%p\n",ptr,(unsigned long)size,udata->vfd_image_ptr);
+		fprintf(stderr,"\t>>>> realloc(%p,%ld)=>%p\n",ptr,(unsigned long)size,udata->vfd_image_ptr);
 #endif
-           udata->vfd_image_size = size;
-	   /* Record that we have new memory block */
-	   assert(oldvfd == udata->h5->mem.memio.memory);
-	   udata->h5->mem.memio.memory = udata->vfd_image_ptr;
-           return_value = udata->vfd_image_ptr;
-	} else {
-	   /* Modified:
-           1. If the realloc new size is <= existing size,
-	      then pretend we did a realloc and return success.
-              This avoids unneccessary heap operations.
-           2. If the H5LT_FILE_IMAGE_DONT_COPY or
-	      H5LT_FILE_IMAGE_DONT_RELEASE flag is set and the
-	      realloc new size is > existing size, then fail
-	      because the realloc() call may change the address
-	      of the buffer. The new address cannot be
-	      communicated to the application to release it.
-	   3. Otherwise, use realloc(). Note that this may have the
-              side effect of freeing the previous memory chunk.
-           */
+	    }
+	    udata->vfd_image_size = size;
+	} else { /* Cannot realloc, so fake it */
 	   if(size <= udata->vfd_image_size) {
 	       /* Ok, pretend we did a realloc but just change size*/
                udata->vfd_image_size = size;
@@ -592,24 +577,15 @@ local_image_free(void *ptr, H5FD_file_image_op_t file_image_op, void *_udata)
 
             udata->fapl_ref_count--;
 
-            /* free the shared buffer only if indicated by the respective flag
-	       and there are no outstanding references */
-            if (udata->fapl_ref_count == 0) {
+	    /* For the way we use it, it should still be the case that
+               the fapl pointer is same as image_ptr, so we do not need
+               to do anything */
+	    assert(udata->fapl_image_ptr == udata->app_image_ptr);
+	    /* clean up */
 #if 0
-		if(udata->fapl_image_ptr == udata->app_image_ptr)
-		    udata->app_image_ptr = NULL;
+	    udata->app_image_ptr = NULL;
+	    udata->fapl_image_ptr = NULL;
 #endif
-		if(udata->fapl_image_ptr == udata->vfd_image_ptr) {
-		    udata->vfd_image_ptr = NULL;
-		    assert(udata->vfd_ref_count == 1);
-		    udata->vfd_ref_count = 0;
-		} 
-	        if(udata->fapl_image_ptr != NULL) {
-		    fprintf(stderr,"\t>>>> fapl free(%p)\n",ptr);
-		    free(udata->fapl_image_ptr);
-		}
-                udata->fapl_image_ptr = NULL;
-	    }
             break;
 
         case H5FD_FILE_IMAGE_OP_FILE_CLOSE:
@@ -620,23 +596,17 @@ local_image_free(void *ptr, H5FD_file_image_op_t file_image_op, void *_udata)
 
             udata->vfd_ref_count--;
 
-            if (udata->vfd_ref_count == 0) {
-		if(udata->vfd_image_ptr == udata->app_image_ptr)
-		    udata->app_image_ptr = NULL;
-		if(udata->fapl_image_ptr == udata->vfd_image_ptr) {
-		    udata->fapl_image_ptr = NULL;
-		    assert(udata->fapl_ref_count == 1);
-		    udata->fapl_ref_count = 0;
-		} 
-	        if(udata->vfd_image_ptr != NULL) {
-		    fprintf(stderr,"\t>>>> vfd free(%p)\n",ptr);
-		    free(udata->vfd_image_ptr);
-		}
-                udata->vfd_image_ptr = NULL;
-	    }
+	    udata->h5->mem.memio.memory = udata->vfd_image_ptr;
+	    udata->h5->mem.memio.size = udata->vfd_image_size;
+	    /* clean up */
+#if 0
+	    udata->app_image_ptr = NULL;
+	    udata->fapl_image_ptr = NULL;
+#endif
+	    udata->vfd_image_ptr = NULL;
             break;
 
-	/* added unused labels to keep the compiler quite */
+	/* added unused labels to keep the compiler quiet */
 	case H5FD_FILE_IMAGE_OP_NO_OP:
 	case H5FD_FILE_IMAGE_OP_PROPERTY_LIST_SET:
 	case H5FD_FILE_IMAGE_OP_PROPERTY_LIST_COPY:

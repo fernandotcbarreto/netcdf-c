@@ -196,15 +196,22 @@ nc4_close_netcdf4_file(NC_FILE_INFO_T *h5, int abort, NC_memio* memio)
 
    /* If inmemory is used and user wants the final memory block,
       then capture and return the final memory block else free it */
-   if(!abort && memio != NULL)
-	*memio = h5->mem.memio; /* capture it */
-   else {/* reclaim */   
-	if(h5->mem.memio.memory != NULL && !h5->no_write && !h5->mem.locked )
+   if(h5->mem.inmemory) {
+       if(!abort && memio != NULL) {
+	    *memio = h5->mem.memio; /* capture it */
+	    h5->mem.memio.memory = NULL; /* avoid duplicate free */
+       }
+       /* If needed, reclaim extraneous memory */
+       if(h5->mem.memio.memory != NULL) {
+	/* If the original block of memory is not resizeable, then
+           it belongs to the caller and we should not free it. */
+	if(!h5->mem.locked)
 	    free(h5->mem.memio.memory);	
+       }
+       h5->mem.memio.memory = NULL;
+       h5->mem.memio.size = 0;
+       NC4_image_finalize(h5->mem.udata);
    }
-   h5->mem.memio.memory = NULL;
-   h5->mem.memio.size = 0;
-   NC4_image_finalize(h5->mem.udata);
 
    /* Free the HDF5-specific info. */
    if (h5->format_file_info)

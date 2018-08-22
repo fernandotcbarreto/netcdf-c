@@ -297,7 +297,7 @@ typedef struct  NC_FILE_INFO
    void *format_file_info;
    struct NCFILEINFO* fileinfo;
    struct NC4_Memio {
-	NC_memio memio;
+	NC_memio memio; /* What we sent to image_init and what comes back*/
 	int locked; /* do not copy and do not free  */
 	int save; /* on close, save this buffer in memio */
 	int persist; /* Should file be persisted out on close? */
