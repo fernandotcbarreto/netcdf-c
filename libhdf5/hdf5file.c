@@ -199,15 +199,6 @@ nc4_close_netcdf4_file(NC_FILE_INFO_T *h5, int abort, NC_memio* memio)
    if (h5->fileinfo)
       free(h5->fileinfo);
 
-   /* Check to see if this is an in-memory file and we want to get its
-      final content. */
-   if(extractmem) {
-      /* File must be read/write */
-      if(!h5->no_write) {
-         retval = NC4_extract_file_image(h5);
-      }
-   }
-
    /* Close hdf file. It may not be open, since this function is also
     * called by NC_create() when a file opening is aborted. */
    if (hdf5_info->hdfid && H5Fclose(hdf5_info->hdfid) < 0)
