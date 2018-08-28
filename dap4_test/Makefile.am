@@ -8,7 +8,9 @@ include $(top_srcdir)/lib_flags.am
 
 #TEST_EXTENSIONS = .sh
 
-#LOG_DRIVER = $(SHELL) $(top_srcdir)/test-driver-verbose
+SH_LOG_DRIVER = $(SHELL) $(top_srcdir)/test-driver-verbose
+sh_LOG_DRIVER = $(SHELL) $(top_srcdir)/test-driver-verbose
+LOG_DRIVER = $(SHELL) $(top_srcdir)/test-driver-verbose
 
 LDADD = ${top_builddir}/liblib/libnetcdf.la
 AM_CPPFLAGS += -I$(top_srcdir)/libdap4
