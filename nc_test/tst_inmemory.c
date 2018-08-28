@@ -613,12 +613,6 @@ main(int argc, char **argv)
     NC_memio filedata3;
     NC_memio filedata4;
 
-#ifdef USE_NETCDF4
-extern int hdf5_set_log_level(int);
-    hdf5_set_log_level(0);
-    H5Eprint1(stderr);
-#endif
-
     fprintf(stderr,"\n*** Testing the inmemory API: netcdf-3.\n");
     CHECK(create_reference_file(FILE3,NC_NETCDF3,&filedata3)); /* netcdf-3 */
     CHECK(test_open(FILE3,&filedata3,NC_NETCDF3));
