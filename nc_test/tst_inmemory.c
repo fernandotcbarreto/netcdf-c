@@ -501,7 +501,7 @@ test_open(const char* path, NC_memio* filedata, int mode)
     /* Check returned finaldata:
        should have same memory but
        actual used final size should not exceed the original */
-    if(finaldata.size >= duplicate.size) CHECK(NC_EINVAL);
+    if(finaldata.size > duplicate.size) CHECK(NC_EINVAL);
     if(finaldata.memory != duplicate.memory) CHECK(NC_EINVAL);
     free(finaldata.memory); finaldata.memory = NULL;
     return stat;
@@ -619,7 +619,6 @@ extern int hdf5_set_log_level(int);
     H5Eprint1(stderr);
 #endif
 
-#if 0
     fprintf(stderr,"\n*** Testing the inmemory API: netcdf-3.\n");
     CHECK(create_reference_file(FILE3,NC_NETCDF3,&filedata3)); /* netcdf-3 */
     CHECK(test_open(FILE3,&filedata3,NC_NETCDF3));
@@ -627,15 +626,14 @@ extern int hdf5_set_log_level(int);
     CHECK(test_misc(FILE3, NC_NETCDF3, &filedata3));
     CHECK(test_xfail(FILE3, NC_NETCDF3, &filedata3));
     memiofree(&filedata3);
-#endif
 
 #ifdef USE_NETCDF4
     fprintf(stderr,"\n*** Testing the inmemory API: netcdf-4.\n");
     CHECK(create_reference_file(FILE4,NC_NETCDF4,&filedata4));
-//    CHECK(test_open(FILE4,&filedata4,NC_NETCDF4));
+    CHECK(test_open(FILE4,&filedata4,NC_NETCDF4));
     CHECK(test_create(CREATE4,NC_NETCDF4));
-//    CHECK(test_misc(FILE4,NC_NETCDF4, &filedata4));
-//    CHECK(test_xfail(FILE4, NC_NETCDF4, &filedata4));
+    CHECK(test_misc(FILE4,NC_NETCDF4, &filedata4));
+    CHECK(test_xfail(FILE4, NC_NETCDF4, &filedata4));
     memiofree(&filedata4);
 #endif
 

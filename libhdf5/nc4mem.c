@@ -65,7 +65,7 @@ int
 NC4_create_image_file(NC_FILE_INFO_T* h5, size_t initialsz)
 {
     int stat = NC_NOERR;
-    int hdfid;
+    hid_t hdfid;
 
     /* Create the file but using our version of H5LTopen_file_image */
     h5->mem.created = 1;

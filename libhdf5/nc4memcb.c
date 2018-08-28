@@ -95,9 +95,9 @@
 #define FALSE 0
 #endif
 
-#define TRACE
-#define CATCH
-#define TRACE_UDATA
+#undef TRACE
+#undef CATCH
+#undef TRACE_UDATA
 
 #ifdef TRACE
 #define CATCH
@@ -108,7 +108,7 @@
 static void trace(const char* fcn, H5FD_file_image_op_t op, void* _udata, ...);
 static void traceend(const char* fcn, void* _udata, uintptr_t retval);
 static const char* traceop(H5FD_file_image_op_t op);
-static void traceflags(int flags);
+static char* traceflags(int flags);
 
 /* In case we do not have variadic macros */
 #define TRACE0(fcn,op,udata)  trace(fcn,op,udata)
@@ -859,16 +859,28 @@ NC4_image_finalize(void* _udata)
 
 #ifdef TRACE
 
-static void
+static char*
 printudata(H5LT_file_image_ud_t* udata)
 {
-    if(udata == NULL) return;
-    fprintf(stderr," flags=");
-    traceflags(udata->flags);
-    fprintf(stderr,"\n\t    ref_count=%d",udata->ref_count);
-    fprintf(stderr,"\n\t    app=(%p,%lld)",udata->app_image_ptr,(long long)udata->app_image_size);
-    fprintf(stderr,"\n\t    fapl=(%p,%lld)[%d]",udata->fapl_image_ptr,(long long)udata->fapl_image_size,udata->fapl_ref_count);
-    fprintf(stderr,"\n\t    vfd=(%p,%lld)[%d]",udata->vfd_image_ptr,(long long)udata->vfd_image_size,udata->vfd_ref_count);
+    char buf[8192];
+    char tmp[8192];
+    char* flags = "";
+
+    buf[0] = '\0';
+    if(udata == NULL) return strdup("");
+    strlcat(buf,"flags=",sizeof(buf));
+    flags = traceflags(udata->flags);
+    strlcat(buf,flags,sizeof(buf));
+    if(flags != NULL) free(flags);
+    snprintf(tmp,sizeof(tmp)," ref_count=%d",udata->ref_count);
+    strlcat(buf,tmp,sizeof(tmp));
+    snprintf(tmp,sizeof(tmp)," app=(%p,%lld)",udata->app_image_ptr,(long long)udata->app_image_size);
+    strlcat(buf,tmp,sizeof(tmp));
+    snprintf(tmp,sizeof(tmp)," fapl=(%p,%lld)[%d]",udata->fapl_image_ptr,(long long)udata->fapl_image_size,udata->fapl_ref_count);
+    strlcat(buf,tmp,sizeof(tmp));
+    snprintf(tmp,sizeof(tmp)," vfd=(%p,%lld)[%d]",udata->vfd_image_ptr,(long long)udata->vfd_image_size,udata->vfd_ref_count);
+    strlcat(buf,tmp,sizeof(tmp));
+    return strdup(buf);
 }
 
 static void
@@ -876,61 +888,70 @@ trace(const char* fcn, H5FD_file_image_op_t op, void* _udata, ...)
 {
     H5LT_file_image_ud_t *udata = NULL;
     va_list ap;
+    char buf[16000];
+    char tmp[8192];
+    char* ud;
 
     va_start(ap, _udata); /* Requires the last fixed parameter (to get the address) */
     udata = (H5LT_file_image_ud_t *)_udata;
+    buf[0] = '\0';
+    snprintf(tmp,sizeof(tmp),"trace [ %s: op=%s: ",fcn,traceop(op));
+    strlcat(buf,tmp,sizeof(tmp));
     if(strcmp("malloc",fcn)==0) {
 	size_t size = va_arg(ap,size_t);
-	fprintf(stderr,"trace: %s: op=%s: size=%lld\n\tudata=",
-		fcn,traceop(op),(long long)size);
-	printudata(udata);
-        fprintf(stderr,"\n");
+        snprintf(tmp,sizeof(tmp),"size=%lld",(long long)size);
     } else if(strcmp("realloc",fcn)==0) {
 	void* ptr = va_arg(ap,void*);
 	size_t size = va_arg(ap,size_t);
-	fprintf(stderr,"trace: %s: op=%s: ptr=%p, size=%lld\n\tudata=",
-		fcn,traceop(op),ptr,(long long)size);
-	printudata(udata);
-        fprintf(stderr,"\n");
+	snprintf(tmp,sizeof(tmp),"ptr=%p, size=%lld",ptr,(long long)size);
     } else if(strcmp("free",fcn)==0) {
 	void* ptr = va_arg(ap,void*);
-	fprintf(stderr,"trace: %s: op=%s: ptr=%p\n\tudata=",fcn,traceop(op),ptr);
-	printudata(udata);
-        fprintf(stderr,"\n");
+	snprintf(tmp,sizeof(tmp),"ptr=%p",ptr);
     } else if(strcmp("memcpy",fcn)==0) {
 	void* dest = va_arg(ap,void*);
 	void* src = va_arg(ap,void*);
 	size_t size = va_arg(ap,size_t);
-	fprintf(stderr,"trace: %s: op=%s: dest=%p src=%p size=%lld\n\tudata=",
-		fcn,traceop(op),dest,src,(long long)size);
-	printudata(udata);
-        fprintf(stderr,"\n");
+	snprintf(tmp,sizeof(tmp),"dest=%p, src=%p, size=%lld",dest,src,(long long)size);
     } else if(strcmp("udata_copy",fcn)==0) {
 #ifdef TRACE_UDATA
-	fprintf(stderr,"trace: %s: udat=%p \n\tudata=",fcn,udata);
-	printudata(udata);
-        fprintf(stderr,"\n");
+	snprintf(tmp,sizeof(tmp),"udata=%p",udata);
 #endif
     } else if(strcmp("udata_free",fcn)==0) {
 #ifdef TRACE_UDATA
-	fprintf(stderr,"trace: %s: udata=%p\n\tudata=",fcn,udata);
-	printudata(udata);
-        fprintf(stderr,"\n");
+	snprintf(tmp,sizeof(tmp),"udata=%p",udata);
 #endif
     } else {
-	fprintf(stderr,"unknown fcn: %s\n",fcn);
+	snprintf(tmp,sizeof(tmp),"unknown fcn: %s",fcn);
     }
+    strlcat(buf,tmp,sizeof(buf));
+    ud = printudata(udata);
+    strlcat(buf,"\n\tudata=",sizeof(buf));
+    strlcat(buf,ud,sizeof(tmp));
+    free(ud);	
+    strlcat(buf,"\n",sizeof(buf));
     va_end(ap);
+    fprintf(stderr,"%s",buf);
     fflush(stderr);
 }
 
 static void
 traceend(const char* fcn, void* _udata, uintptr_t retval)
 {
+    char buf[16000];
+    char tmp[8192];
+    char* ud;
+    const char* tab = "    ";
+
+    buf[0] = '\0';
     H5LT_file_image_ud_t *udata = (H5LT_file_image_ud_t *)_udata;
-    fprintf(stderr,"traceend: %s: retval=%p\n\tudata=",fcn,(void*)retval);
-    printudata(udata);
-    fprintf(stderr,"\n");
+    snprintf(tmp,sizeof(tmp),"%s]: retval=%p",tab,(void*)retval);
+    strlcat(buf,tmp,sizeof(buf));
+    strlcat(buf," udata=",sizeof(buf));
+    ud = printudata(udata);
+    strlcat(buf,ud,sizeof(tmp));
+    free(ud);	
+    strlcat(buf,"\n",sizeof(buf));
+    fprintf(stderr,"%s",buf);
     fflush(stderr);
 }
 
@@ -946,31 +967,35 @@ tracefail(const char* fcn)
 #endif /*CATCH*/
 
 #ifdef TRACE
-static void
+static char*
 traceflags(int flags)
 {
     int i;
+    char buf[8192];
+    char tmp[8192];
+    buf[0] = '\0';
     for(i=0;i<16;i++) {
+	tmp[0] = '\0';
 	if((flags & 1<<i) == 0) continue;
+        if(i > 0) strlcat(tmp,"|",sizeof(tmp));
 	switch(1<<i) {
 	case H5LT_FILE_IMAGE_OPEN_RW: /* 0x0001 Open image for read-write */
-	    if(i > 0) fprintf(stderr,"|");
-	    fprintf(stderr,"OPEN_RW");
+	    strlcat(tmp,"OPEN_RW",sizeof(tmp));
 	    break;
 	case H5LT_FILE_IMAGE_DONT_COPY: /*0x0002 the HDF5 lib won't copy   */
-	    if(i > 0) fprintf(stderr,"|");
-	    fprintf(stderr,"DONT_COPY");
+	    strlcat(tmp,"DONT_COPY",sizeof(tmp));
 	    break;
 	case H5LT_FILE_IMAGE_DONT_RELEASE: /* 0x0004 The HDF5 lib won't
                                               deallocate user supplied image
                                               buffer. The user application
                                               is reponsible for doing so. */
-	    if(i > 0) fprintf(stderr,"|");
-	    fprintf(stderr,"DONT_RELEASE");
+	    strlcat(tmp,"DONT_RELEASE",sizeof(tmp));
 	    break;
 	default: break;
 	}
+	strlcat(buf,tmp,sizeof(buf));
     }
+    return strdup(buf);
 }
 
 static const char*

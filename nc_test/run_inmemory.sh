@@ -26,6 +26,7 @@ HASNC4=`${top_builddir}/nc-config --has-nc4`
 
 # Execute the core of the inmemory tests
 ${execdir}/tst_inmemory
+exit
 ${execdir}/tst_open_mem ${srcdir}/${OMEMFILE}
 
 echo "**** Test ncdump of the resulting inmemory data"
