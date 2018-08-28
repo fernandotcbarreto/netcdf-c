@@ -11,6 +11,7 @@ include $(top_srcdir)/lib_flags.am
 SH_LOG_DRIVER = $(SHELL) $(top_srcdir)/test-driver-verbose
 sh_LOG_DRIVER = $(SHELL) $(top_srcdir)/test-driver-verbose
 LOG_DRIVER = $(SHELL) $(top_srcdir)/test-driver-verbose
+TESTS_ENVIRONMENT = export SETX=1;
 
 LDADD = ${top_builddir}/liblib/libnetcdf.la
 AM_CPPFLAGS += -I$(top_srcdir)/libdap4
